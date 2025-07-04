@@ -36,16 +36,18 @@ import androidx.wear.compose.material.TimeText
 import androidx.wear.tooling.preview.devices.WearDevices
 import com.example.tennistracker.R
 import com.example.tennistracker.presentation.theme.TennisTrackerTheme
-
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-data class Measurement(val x: Float, val y: Float, val z: Float)
+data class Measurement(
+    val x: Float,
+    val y: Float,
+    val z: Float,
+)
 
 class MeasurementViewModel : ViewModel() {
-
     fun MeasurementViewModel() {
     }
 
@@ -64,7 +66,9 @@ class MeasurementViewModel : ViewModel() {
     val gyroMeasurement: StateFlow<Measurement> = _gyroMeasurement.asStateFlow()
 }
 
-class MainActivity : ComponentActivity(), SensorEventListener {
+class MainActivity :
+    ComponentActivity(),
+    SensorEventListener {
     companion object {
         const val TAG = "MainActivity"
     }
@@ -120,20 +124,23 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
+    override fun onAccuracyChanged(
+        sensor: Sensor,
+        accuracy: Int,
+    ) {
         Log.e(TAG, "Accuracy changed $sensor $accuracy")
     }
 }
 
 @Composable
 fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementViewModel()) {
-
     TennisTrackerTheme {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colors.background),
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colors.background),
+            contentAlignment = Alignment.Center,
         ) {
             TimeText()
             SensorValuesScreen(measurementViewModel)
@@ -143,19 +150,17 @@ fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementViewModel())
 
 @Composable
 fun SensorValuesScreen(measurementViewModel: MeasurementViewModel = MeasurementViewModel()) {
-
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         DisplayValues(measurementViewModel)
     }
 }
 
 @Composable
 fun DisplayValues(measurementViewModel: MeasurementViewModel) {
-
     val measurementData by measurementViewModel.gyroMeasurement.collectAsState()
 
     Row {
@@ -163,22 +168,22 @@ fun DisplayValues(measurementViewModel: MeasurementViewModel) {
             Text(
                 modifier = Modifier.width(20.dp),
                 textAlign = TextAlign.Left,
-                text = ""
+                text = "",
             )
             Text(
                 modifier = Modifier.width(20.dp),
                 textAlign = TextAlign.Left,
-                text = "X:"
+                text = "X:",
             )
             Text(
                 modifier = Modifier.width(20.dp),
                 textAlign = TextAlign.Left,
-                text = "Y:"
+                text = "Y:",
             )
             Text(
                 modifier = Modifier.width(20.dp),
                 textAlign = TextAlign.Left,
-                text = "Z:"
+                text = "Z:",
             )
         }
         DisplayGyroColumn(measurementViewModel)
@@ -188,58 +193,56 @@ fun DisplayValues(measurementViewModel: MeasurementViewModel) {
 
 @Composable
 fun DisplayGyroColumn(measurementViewModel: MeasurementViewModel) {
-
     val measurementData by measurementViewModel.gyroMeasurement.collectAsState()
 
     Column {
         Text(
             modifier = Modifier.width(50.dp),
             textAlign = TextAlign.Center,
-            text = "Gyro"
+            text = "Gyro",
         )
         Text(
             modifier = Modifier.width(50.dp),
             textAlign = TextAlign.Right,
-            text = "%.2f".format(measurementData.x)
+            text = "%.2f".format(measurementData.x),
         )
         Text(
             modifier = Modifier.width(50.dp),
             textAlign = TextAlign.Right,
-            text = "%.2f".format(measurementData.y)
+            text = "%.2f".format(measurementData.y),
         )
         Text(
             modifier = Modifier.width(50.dp),
             textAlign = TextAlign.Right,
-            text = "%.2f".format(measurementData.z)
+            text = "%.2f".format(measurementData.z),
         )
     }
 }
 
 @Composable
 fun DisplayAccelColumn(measurementViewModel: MeasurementViewModel) {
-
     val measurementData by measurementViewModel.accelMeasurement.collectAsState()
 
     Column {
         Text(
             modifier = Modifier.width(50.dp),
             textAlign = TextAlign.Center,
-            text = "Acc"
+            text = "Acc",
         )
         Text(
             modifier = Modifier.width(50.dp),
             textAlign = TextAlign.Right,
-            text = "%.2f".format(measurementData.x)
+            text = "%.2f".format(measurementData.x),
         )
         Text(
             modifier = Modifier.width(50.dp),
             textAlign = TextAlign.Right,
-            text = "%.2f".format(measurementData.y)
+            text = "%.2f".format(measurementData.y),
         )
         Text(
             modifier = Modifier.width(50.dp),
             textAlign = TextAlign.Right,
-            text = "%.2f".format(measurementData.z)
+            text = "%.2f".format(measurementData.z),
         )
     }
 }
