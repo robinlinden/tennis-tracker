@@ -5,6 +5,13 @@ on:
   workflow_dispatch:
 
 jobs:
+  ktlint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: curl -sSLO https://github.com/pinterest/ktlint/releases/download/1.6.0/ktlint && chmod a+x ktlint
+      - run: ./ktlint
+
   gradle:
     runs-on: ${{ matrix.os }}
     strategy:
