@@ -48,9 +48,6 @@ data class Measurement(
 )
 
 class MeasurementViewModel : ViewModel() {
-    fun MeasurementViewModel() {
-    }
-
     fun setAccelMeasurement(newMeasurement: Measurement) {
         _accelMeasurement.update { newMeasurement }
     }
