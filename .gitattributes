@@ -2,3 +2,5 @@
 
 # Windows wants .bat-files to use CRLF.
 *.bat text eof=crlf
+
+*.jar binary
