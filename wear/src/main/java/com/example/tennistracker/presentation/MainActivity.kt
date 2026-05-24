@@ -20,8 +20,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,6 +36,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.ViewModel
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
@@ -43,6 +50,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MeasurementViewModel : ViewModel() {
     private val _accelMeasurement = MutableStateFlow(Measurement(0.0f, 0.0f, 0.0f, 0L))
@@ -54,12 +64,26 @@ class MeasurementViewModel : ViewModel() {
     private val _isMeasuring = MutableStateFlow(false)
     val isMeasuring: StateFlow<Boolean> = _isMeasuring.asStateFlow()
 
+    private val _capturedAccel = MutableStateFlow<List<Measurement>>(emptyList())
+    val capturedAccel: StateFlow<List<Measurement>> = _capturedAccel.asStateFlow()
+
+    private val _capturedGyro = MutableStateFlow<List<Measurement>>(emptyList())
+    val capturedGyro: StateFlow<List<Measurement>> = _capturedGyro.asStateFlow()
+
     fun setAccelMeasurement(newMeasurement: Measurement) {
         _accelMeasurement.update { newMeasurement }
     }
 
     fun setGyroMeasurement(newMeasurement: Measurement) {
         _gyroMeasurement.update { newMeasurement }
+    }
+
+    fun addAccelMeasurement(measurement: Measurement) {
+        _capturedAccel.update { it + measurement }
+    }
+
+    fun addGyroMeasurement(measurement: Measurement) {
+        _capturedGyro.update { it + measurement }
     }
 
     fun toggleMeasuring() {
@@ -77,10 +101,6 @@ class MainActivity :
     lateinit var sensorManager: SensorManager
     lateinit var accelerometer: Sensor
     lateinit var gyroscope: Sensor
-
-    // TODO(robinlinden): Dump to a file on activity exit or something.
-    val accelerometerValues = mutableListOf<Measurement>()
-    val gyroscopeValues = mutableListOf<Measurement>()
 
     var measurementViewModel: MeasurementViewModel = MeasurementViewModel()
 
@@ -116,13 +136,13 @@ class MainActivity :
         val measurement = Measurement(e.values[0], e.values[1], e.values[2], System.currentTimeMillis())
         if (e.sensor.type == Sensor.TYPE_ACCELEROMETER) {
             if (measurementViewModel.isMeasuring.value) {
-                accelerometerValues.add(measurement)
+                measurementViewModel.addAccelMeasurement(measurement)
             }
             measurementViewModel.setAccelMeasurement(measurement)
             Log.w(TAG, "Accelerometer $measurement")
         } else {
             if (measurementViewModel.isMeasuring.value) {
-                gyroscopeValues.add(measurement)
+                measurementViewModel.addGyroMeasurement(measurement)
             }
             measurementViewModel.setGyroMeasurement(measurement)
             Log.w(TAG, "Gyroscope $measurement")
@@ -139,16 +159,62 @@ class MainActivity :
 
 @Composable
 fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementViewModel()) {
+    val pagerState = rememberPagerState(pageCount = { 3 })
     TennisTrackerTheme {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colors.background),
-            contentAlignment = Alignment.Center,
-        ) {
-            TimeText()
-            SensorValuesScreen(measurementViewModel)
+        HorizontalPager(state = pagerState) { page ->
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colors.background),
+                contentAlignment = Alignment.Center,
+            ) {
+                TimeText()
+                when (page) {
+                    0 -> SensorValuesScreen(measurementViewModel)
+                    1 -> HistoryScreen("Acc History", measurementViewModel.capturedAccel)
+                    2 -> HistoryScreen("Gyro History", measurementViewModel.capturedGyro)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HistoryScreen(
+    title: String,
+    measurementsFlow: StateFlow<List<Measurement>>,
+) {
+    val measurements by measurementsFlow.collectAsState()
+    val timeFormatter = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
+
+    ScalingLazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        autoCentering = AutoCenteringParams(itemIndex = 0),
+    ) {
+        item {
+            Text(
+                modifier = Modifier.padding(bottom = 8.dp),
+                textAlign = TextAlign.Center,
+                text = title,
+                style = MaterialTheme.typography.title3,
+            )
+        }
+        items(measurements.asReversed()) { m ->
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = timeFormatter.format(Date(m.timestamp)),
+                    style = MaterialTheme.typography.caption2,
+                    color = MaterialTheme.colors.secondary,
+                )
+                Text(
+                    text = "%.2f, %.2f, %.2f".format(m.x, m.y, m.z),
+                    style = MaterialTheme.typography.caption2,
+                )
+            }
         }
     }
 }
