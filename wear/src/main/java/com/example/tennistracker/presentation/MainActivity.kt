@@ -163,13 +163,11 @@ class MainActivity :
                 measurementViewModel.addAccelMeasurement(measurement)
             }
             measurementViewModel.setAccelMeasurement(measurement)
-            Log.w(TAG, "Accelerometer $measurement")
         } else {
             if (measurementViewModel.isMeasuring.value) {
                 measurementViewModel.addGyroMeasurement(measurement)
             }
             measurementViewModel.setGyroMeasurement(measurement)
-            Log.w(TAG, "Gyroscope $measurement")
         }
     }
 
