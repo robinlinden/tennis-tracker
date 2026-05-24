@@ -45,10 +45,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 class MeasurementViewModel : ViewModel() {
-    private val _accelMeasurement = MutableStateFlow(Measurement(0.0f, 0.0f, 0.0f))
+    private val _accelMeasurement = MutableStateFlow(Measurement(0.0f, 0.0f, 0.0f, 0L))
     val accelMeasurement: StateFlow<Measurement> = _accelMeasurement.asStateFlow()
 
-    private val _gyroMeasurement = MutableStateFlow(Measurement(0.0f, 0.0f, 0.0f))
+    private val _gyroMeasurement = MutableStateFlow(Measurement(0.0f, 0.0f, 0.0f, 0L))
     val gyroMeasurement: StateFlow<Measurement> = _gyroMeasurement.asStateFlow()
 
     private val _isMeasuring = MutableStateFlow(false)
@@ -113,7 +113,7 @@ class MainActivity :
 
     override fun onSensorChanged(e: SensorEvent) {
         // TODO(robinlinden): Only add measurement if not very near the last-added one?
-        val measurement = Measurement(e.values[0], e.values[1], e.values[2])
+        val measurement = Measurement(e.values[0], e.values[1], e.values[2], System.currentTimeMillis())
         if (e.sensor.type == Sensor.TYPE_ACCELEROMETER) {
             if (measurementViewModel.isMeasuring.value) {
                 accelerometerValues.add(measurement)
