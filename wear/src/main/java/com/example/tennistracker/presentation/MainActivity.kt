@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -30,6 +32,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.ViewModel
+import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
@@ -42,6 +45,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 class MeasurementViewModel : ViewModel() {
+    private val _accelMeasurement = MutableStateFlow(Measurement(0.0f, 0.0f, 0.0f))
+    val accelMeasurement: StateFlow<Measurement> = _accelMeasurement.asStateFlow()
+
+    private val _gyroMeasurement = MutableStateFlow(Measurement(0.0f, 0.0f, 0.0f))
+    val gyroMeasurement: StateFlow<Measurement> = _gyroMeasurement.asStateFlow()
+
+    private val _isMeasuring = MutableStateFlow(false)
+    val isMeasuring: StateFlow<Boolean> = _isMeasuring.asStateFlow()
+
     fun setAccelMeasurement(newMeasurement: Measurement) {
         _accelMeasurement.update { newMeasurement }
     }
@@ -50,11 +62,9 @@ class MeasurementViewModel : ViewModel() {
         _gyroMeasurement.update { newMeasurement }
     }
 
-    private val _accelMeasurement = MutableStateFlow(Measurement(0.0f, 0.0f, 0.0f))
-    val accelMeasurement: StateFlow<Measurement> = _accelMeasurement.asStateFlow()
-
-    private val _gyroMeasurement = MutableStateFlow(Measurement(0.0f, 0.0f, 0.0f))
-    val gyroMeasurement: StateFlow<Measurement> = _gyroMeasurement.asStateFlow()
+    fun toggleMeasuring() {
+        _isMeasuring.update { !it }
+    }
 }
 
 class MainActivity :
@@ -68,9 +78,9 @@ class MainActivity :
     lateinit var accelerometer: Sensor
     lateinit var gyroscope: Sensor
 
-    // TODO(robinlinden): Save values, dump to a file on activity exit or something.
-    // val accelerometerValues = mutableListOf<Measurement>()
-    // val gyroscopeValues = mutableListOf<Measurement>()
+    // TODO(robinlinden): Dump to a file on activity exit or something.
+    val accelerometerValues = mutableListOf<Measurement>()
+    val gyroscopeValues = mutableListOf<Measurement>()
 
     var measurementViewModel: MeasurementViewModel = MeasurementViewModel()
 
@@ -105,11 +115,15 @@ class MainActivity :
         // TODO(robinlinden): Only add measurement if not very near the last-added one?
         val measurement = Measurement(e.values[0], e.values[1], e.values[2])
         if (e.sensor.type == Sensor.TYPE_ACCELEROMETER) {
-            // accelerometerValues.add(measurement)
+            if (measurementViewModel.isMeasuring.value) {
+                accelerometerValues.add(measurement)
+            }
             measurementViewModel.setAccelMeasurement(measurement)
             Log.w(TAG, "Accelerometer $measurement")
         } else {
-            // gyroscopeValues.add(measurement)
+            if (measurementViewModel.isMeasuring.value) {
+                gyroscopeValues.add(measurement)
+            }
             measurementViewModel.setGyroMeasurement(measurement)
             Log.w(TAG, "Gyroscope $measurement")
         }
@@ -141,12 +155,18 @@ fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementViewModel())
 
 @Composable
 fun SensorValuesScreen(measurementViewModel: MeasurementViewModel = MeasurementViewModel()) {
+    val isMeasuring by measurementViewModel.isMeasuring.collectAsState()
+
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         DisplayValues(measurementViewModel)
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(onClick = { measurementViewModel.toggleMeasuring() }) {
+            Text(if (isMeasuring) "Stop" else "Start")
+        }
     }
 }
 
