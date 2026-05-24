@@ -53,6 +53,7 @@ import kotlinx.coroutines.flow.update
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
 
 class MeasurementViewModel : ViewModel() {
     private val _accelMeasurement = MutableStateFlow(Measurement(0.0f, 0.0f, 0.0f, 0L))
@@ -79,11 +80,35 @@ class MeasurementViewModel : ViewModel() {
     }
 
     fun addAccelMeasurement(measurement: Measurement) {
-        _capturedAccel.update { it + measurement }
+        _capturedAccel.update { list ->
+            val last = list.lastOrNull()
+            if (last == null ||
+                abs(last.x - measurement.x) > 0.1f ||
+                abs(last.y - measurement.y) > 0.1f ||
+                abs(last.z - measurement.z) > 0.1f ||
+                measurement.timestamp - last.timestamp > 10_000
+            ) {
+                list + measurement
+            } else {
+                list
+            }
+        }
     }
 
     fun addGyroMeasurement(measurement: Measurement) {
-        _capturedGyro.update { it + measurement }
+        _capturedGyro.update { list ->
+            val last = list.lastOrNull()
+            if (last == null ||
+                abs(last.x - measurement.x) > 0.1f ||
+                abs(last.y - measurement.y) > 0.1f ||
+                abs(last.z - measurement.z) > 0.1f ||
+                measurement.timestamp - last.timestamp > 10_000
+            ) {
+                list + measurement
+            } else {
+                list
+            }
+        }
     }
 
     fun toggleMeasuring() {
@@ -132,7 +157,6 @@ class MainActivity :
     }
 
     override fun onSensorChanged(e: SensorEvent) {
-        // TODO(robinlinden): Only add measurement if not very near the last-added one?
         val measurement = Measurement(e.values[0], e.values[1], e.values[2], System.currentTimeMillis())
         if (e.sensor.type == Sensor.TYPE_ACCELEROMETER) {
             if (measurementViewModel.isMeasuring.value) {
