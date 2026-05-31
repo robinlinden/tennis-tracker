@@ -182,6 +182,13 @@ class MainActivity :
 @Composable
 fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementViewModel()) {
     val pagerState = rememberPagerState(pageCount = { 3 })
+
+    val accelMeasurement by measurementViewModel.accelMeasurement.collectAsState()
+    val gyroMeasurement by measurementViewModel.gyroMeasurement.collectAsState()
+    val isMeasuring by measurementViewModel.isMeasuring.collectAsState()
+    val capturedAccel by measurementViewModel.capturedAccel.collectAsState()
+    val capturedGyro by measurementViewModel.capturedGyro.collectAsState()
+
     TennisTrackerTheme {
         HorizontalPager(state = pagerState) { page ->
             Box(
@@ -193,9 +200,22 @@ fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementViewModel())
             ) {
                 TimeText()
                 when (page) {
-                    0 -> SensorValuesScreen(measurementViewModel)
-                    1 -> HistoryScreen("Acc History", measurementViewModel.capturedAccel)
-                    2 -> HistoryScreen("Gyro History", measurementViewModel.capturedGyro)
+                    0 -> {
+                        SensorValuesScreen(
+                            isMeasuring = isMeasuring,
+                            gyroMeasurement = gyroMeasurement,
+                            accelMeasurement = accelMeasurement,
+                            onToggleMeasuring = { measurementViewModel.toggleMeasuring() },
+                        )
+                    }
+
+                    1 -> {
+                        HistoryScreen("Acc History", capturedAccel)
+                    }
+
+                    2 -> {
+                        HistoryScreen("Gyro History", capturedGyro)
+                    }
                 }
             }
         }
@@ -205,9 +225,8 @@ fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementViewModel())
 @Composable
 fun HistoryScreen(
     title: String,
-    measurementsFlow: StateFlow<List<Measurement>>,
+    measurements: List<Measurement>,
 ) {
-    val measurements by measurementsFlow.collectAsState()
     val timeFormatter = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
 
     ScalingLazyColumn(
@@ -242,24 +261,33 @@ fun HistoryScreen(
 }
 
 @Composable
-fun SensorValuesScreen(measurementViewModel: MeasurementViewModel = MeasurementViewModel()) {
-    val isMeasuring by measurementViewModel.isMeasuring.collectAsState()
-
+fun SensorValuesScreen(
+    isMeasuring: Boolean,
+    gyroMeasurement: Measurement,
+    accelMeasurement: Measurement,
+    onToggleMeasuring: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        DisplayValues(measurementViewModel)
+        DisplayValues(
+            gyroMeasurement = gyroMeasurement,
+            accelMeasurement = accelMeasurement,
+        )
         Spacer(modifier = Modifier.height(8.dp))
-        Button(onClick = { measurementViewModel.toggleMeasuring() }) {
+        Button(onClick = onToggleMeasuring) {
             Text(if (isMeasuring) "Stop" else "Start")
         }
     }
 }
 
 @Composable
-fun DisplayValues(measurementViewModel: MeasurementViewModel) {
+fun DisplayValues(
+    gyroMeasurement: Measurement,
+    accelMeasurement: Measurement,
+) {
     Row {
         Column {
             Text(
@@ -283,18 +311,16 @@ fun DisplayValues(measurementViewModel: MeasurementViewModel) {
                 text = "Z:",
             )
         }
-        MeasurementsColumn("Gyro", measurementViewModel.gyroMeasurement)
-        MeasurementsColumn("Acc", measurementViewModel.accelMeasurement)
+        MeasurementsColumn("Gyro", gyroMeasurement)
+        MeasurementsColumn("Acc", accelMeasurement)
     }
 }
 
 @Composable
 fun MeasurementsColumn(
     title: String,
-    measurements: StateFlow<Measurement>,
+    measurement: Measurement,
 ) {
-    val measurement by measurements.collectAsState()
-
     Column {
         Text(
             modifier = Modifier.width(50.dp),
