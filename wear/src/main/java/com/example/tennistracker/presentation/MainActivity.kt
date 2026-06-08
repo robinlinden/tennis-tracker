@@ -40,6 +40,7 @@ import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
 import androidx.wear.tooling.preview.devices.WearDevices
 import com.example.tennistracker.common.Measurement
+import com.example.tennistracker.common.Session
 import com.example.tennistracker.presentation.theme.TennisTrackerTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -60,11 +61,11 @@ class MeasurementViewModel : ViewModel() {
     private val _isMeasuring = MutableStateFlow(false)
     val isMeasuring: StateFlow<Boolean> = _isMeasuring.asStateFlow()
 
-    private val _capturedAccel = MutableStateFlow<List<Measurement>>(emptyList())
-    val capturedAccel: StateFlow<List<Measurement>> = _capturedAccel.asStateFlow()
+    private val _capturedAccel = MutableStateFlow<List<Session>>(emptyList())
+    val capturedAccel: StateFlow<List<Session>> = _capturedAccel.asStateFlow()
 
-    private val _capturedGyro = MutableStateFlow<List<Measurement>>(emptyList())
-    val capturedGyro: StateFlow<List<Measurement>> = _capturedGyro.asStateFlow()
+    private val _capturedGyro = MutableStateFlow<List<Session>>(emptyList())
+    val capturedGyro: StateFlow<List<Session>> = _capturedGyro.asStateFlow()
 
     fun setAccelMeasurement(newMeasurement: Measurement) {
         _accelMeasurement.update { newMeasurement }
@@ -75,39 +76,50 @@ class MeasurementViewModel : ViewModel() {
     }
 
     fun addAccelMeasurement(measurement: Measurement) {
-        _capturedAccel.update { list ->
-            val last = list.lastOrNull()
+        _capturedAccel.update { sessions ->
+            if (sessions.isEmpty()) return@update sessions
+            val currentSession = sessions.last()
+            val last = currentSession.measurements.lastOrNull()
             if (last == null ||
                 abs(last.x - measurement.x) > 0.1f ||
                 abs(last.y - measurement.y) > 0.1f ||
                 abs(last.z - measurement.z) > 0.1f ||
                 measurement.timestamp - last.timestamp > 10_000
             ) {
-                list + measurement
+                sessions.dropLast(1) + currentSession.copy(measurements = currentSession.measurements + measurement)
             } else {
-                list
+                sessions
             }
         }
     }
 
     fun addGyroMeasurement(measurement: Measurement) {
-        _capturedGyro.update { list ->
-            val last = list.lastOrNull()
+        _capturedGyro.update { sessions ->
+            if (sessions.isEmpty()) return@update sessions
+            val currentSession = sessions.last()
+            val last = currentSession.measurements.lastOrNull()
             if (last == null ||
                 abs(last.x - measurement.x) > 0.1f ||
                 abs(last.y - measurement.y) > 0.1f ||
                 abs(last.z - measurement.z) > 0.1f ||
                 measurement.timestamp - last.timestamp > 10_000
             ) {
-                list + measurement
+                sessions.dropLast(1) + currentSession.copy(measurements = currentSession.measurements + measurement)
             } else {
-                list
+                sessions
             }
         }
     }
 
     fun toggleMeasuring() {
-        _isMeasuring.update { !it }
+        _isMeasuring.update { wasMeasuring ->
+            val nowMeasuring = !wasMeasuring
+            if (nowMeasuring) {
+                _capturedAccel.update { it + Session() }
+                _capturedGyro.update { it + Session() }
+            }
+            nowMeasuring
+        }
     }
 }
 
@@ -220,7 +232,7 @@ fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementViewModel())
 @Composable
 fun HistoryScreen(
     title: String,
-    measurements: List<Measurement>,
+    sessions: List<Session>,
 ) {
     val timeFormatter = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
 
@@ -236,20 +248,30 @@ fun HistoryScreen(
                 style = MaterialTheme.typography.title3,
             )
         }
-        items(measurements.asReversed()) { m ->
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
+        sessions.asReversed().forEachIndexed { index, session ->
+            item {
                 Text(
-                    text = timeFormatter.format(Date(m.timestamp)),
-                    style = MaterialTheme.typography.caption2,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                    text = "Session ${sessions.size - index}",
+                    style = MaterialTheme.typography.caption1,
                     color = MaterialTheme.colors.secondary,
                 )
-                Text(
-                    text = "%.2f, %.2f, %.2f".format(m.x, m.y, m.z),
-                    style = MaterialTheme.typography.caption2,
-                )
+            }
+            items(session.measurements.asReversed()) { m ->
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = timeFormatter.format(Date(m.timestamp)),
+                        style = MaterialTheme.typography.caption2,
+                        color = MaterialTheme.colors.secondary,
+                    )
+                    Text(
+                        text = "%.2f, %.2f, %.2f".format(m.x, m.y, m.z),
+                        style = MaterialTheme.typography.caption2,
+                    )
+                }
             }
         }
     }
