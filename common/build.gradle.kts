@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace = "com.example.tennistracker.common"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 25
