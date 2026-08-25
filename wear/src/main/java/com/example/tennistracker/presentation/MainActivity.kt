@@ -26,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -48,7 +49,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 import kotlin.math.abs
 
 class MeasurementViewModel : ViewModel() {
@@ -234,7 +234,7 @@ fun HistoryScreen(
     title: String,
     sessions: List<Session>,
 ) {
-    val timeFormatter = SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault())
+    val timeFormatter = SimpleDateFormat("HH:mm:ss.SSS", LocalLocale.current.platformLocale)
 
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
