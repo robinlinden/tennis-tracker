@@ -14,7 +14,8 @@ jobs:
           distribution: temurin
           java-version: 17
       - run: curl -sSLO https://github.com/pinterest/ktlint/releases/download/1.8.0/ktlint && chmod a+x ktlint
-      - run: ./ktlint
+      - run: curl -sSLo compose-rules https://github.com/mrmans0n/compose-rules/releases/download/v0.6.4/ktlint-compose-0.6.4-all.jar
+      - run: ./ktlint --ruleset=compose-rules
 
   gradle:
     runs-on: ${{ matrix.os }}
