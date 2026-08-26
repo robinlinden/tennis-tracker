@@ -85,7 +85,7 @@ fun MobileApp(
 }
 
 @Composable
-fun SessionItem(session: Session) {
+private fun SessionItem(session: Session) {
     val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", LocalLocale.current.platformLocale)
     Card(
         modifier =

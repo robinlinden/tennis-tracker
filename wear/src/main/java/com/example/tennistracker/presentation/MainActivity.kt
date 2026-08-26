@@ -245,7 +245,7 @@ class MainActivity :
 }
 
 @Composable
-fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementViewModel()) {
+private fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementViewModel()) {
     val pagerState = rememberPagerState(pageCount = { 3 })
 
     val accelMeasurement by measurementViewModel.accelMeasurement.collectAsState()
@@ -288,7 +288,7 @@ fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementViewModel())
 }
 
 @Composable
-fun HistoryScreen(
+private fun HistoryScreen(
     title: String,
     sessions: List<Session>,
 ) {
@@ -336,7 +336,7 @@ fun HistoryScreen(
 }
 
 @Composable
-fun SensorValuesScreen(
+private fun SensorValuesScreen(
     isMeasuring: Boolean,
     gyroMeasurement: Measurement,
     accelMeasurement: Measurement,
@@ -359,7 +359,7 @@ fun SensorValuesScreen(
 }
 
 @Composable
-fun DisplayValues(
+private fun DisplayValues(
     gyroMeasurement: Measurement,
     accelMeasurement: Measurement,
 ) {
@@ -392,7 +392,7 @@ fun DisplayValues(
 }
 
 @Composable
-fun MeasurementsColumn(
+private fun MeasurementsColumn(
     title: String,
     measurement: Measurement,
 ) {
@@ -422,6 +422,6 @@ fun MeasurementsColumn(
 
 @Preview(device = WearDevices.SMALL_ROUND, showSystemUi = true)
 @Composable
-fun DefaultPreview() {
+private fun DefaultPreview() {
     WearApp()
 }
