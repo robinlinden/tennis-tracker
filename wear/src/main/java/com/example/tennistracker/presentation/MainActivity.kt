@@ -43,10 +43,15 @@ import androidx.wear.tooling.preview.devices.WearDevices
 import com.example.tennistracker.common.Measurement
 import com.example.tennistracker.common.Session
 import com.example.tennistracker.presentation.theme.TennisTrackerTheme
+import com.google.android.gms.wearable.DataClient
+import com.google.android.gms.wearable.PutDataMapRequest
+import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import org.json.JSONArray
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import kotlin.math.abs
@@ -66,6 +71,12 @@ class MeasurementViewModel : ViewModel() {
 
     private val _capturedGyro = MutableStateFlow<List<Session>>(emptyList())
     val capturedGyro: StateFlow<List<Session>> = _capturedGyro.asStateFlow()
+
+    private var dataClient: DataClient? = null
+
+    fun setDataClient(client: DataClient) {
+        dataClient = client
+    }
 
     fun setAccelMeasurement(newMeasurement: Measurement) {
         _accelMeasurement.update { newMeasurement }
@@ -117,9 +128,54 @@ class MeasurementViewModel : ViewModel() {
             if (nowMeasuring) {
                 _capturedAccel.update { it + Session() }
                 _capturedGyro.update { it + Session() }
+            } else {
+                _capturedAccel.value.lastOrNull()?.let { syncSession(it, "accel") }
+                _capturedGyro.value.lastOrNull()?.let { syncSession(it, "gyro") }
             }
             nowMeasuring
         }
+    }
+
+    private fun syncSession(
+        session: Session,
+        type: String,
+    ) {
+        val client = dataClient ?: return
+
+        val json =
+            JSONObject().apply {
+                put("timestamp", session.timestamp)
+                put("type", type)
+
+                val measurements = JSONArray()
+                session.measurements.forEach { m ->
+                    val sample =
+                        JSONObject().apply {
+                            put("x", m.x)
+                            put("y", m.y)
+                            put("z", m.z)
+                            put("timestamp", m.timestamp)
+                        }
+
+                    measurements.put(sample)
+                }
+
+                put("measurements", measurements)
+            }
+
+        val putRequest =
+            PutDataMapRequest.create("/sessions/$type/${session.timestamp}").run {
+                dataMap.putString("session_data", json.toString())
+                dataMap.putLong("timestamp", System.currentTimeMillis())
+                asPutDataRequest().apply {
+                    setUrgent()
+                }
+            }
+
+        client
+            .putDataItem(putRequest)
+            .addOnSuccessListener { Log.d("Sync", "Successfully synced session $type ${session.timestamp}") }
+            .addOnFailureListener { Log.e("Sync", "Failed to sync session $type ${session.timestamp}", it) }
     }
 }
 
@@ -144,6 +200,8 @@ class MainActivity :
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)!!
         gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)!!
+
+        measurementViewModel.setDataClient(Wearable.getDataClient(this))
 
         setTheme(android.R.style.Theme_DeviceDefault)
 
