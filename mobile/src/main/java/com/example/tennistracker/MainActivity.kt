@@ -129,14 +129,20 @@ private fun SessionItem(session: Session) {
             )
 
             Text(
-                text = "${session.measurements.size} measurements",
+                text = "${session.accelerometerMeasurements.size} accel, ${session.gyroscopeMeasurements.size} gyro measurements",
                 style = MaterialTheme.typography.bodyMedium,
             )
 
             // TODO(robinlinden): Do something less silly here.
-            session.measurements.take(3).forEach { m ->
+            session.accelerometerMeasurements.take(3).forEach { m ->
                 Text(
-                    text = "%.2f, %.2f, %.2f".format(m.x, m.y, m.z),
+                    text = "A: %.2f, %.2f, %.2f".format(m.x, m.y, m.z),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            session.gyroscopeMeasurements.take(3).forEach { m ->
+                Text(
+                    text = "G: %.2f, %.2f, %.2f".format(m.x, m.y, m.z),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -26,7 +25,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -34,7 +32,6 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.ViewModel
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
-import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
@@ -52,8 +49,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import org.json.JSONArray
 import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.Date
 import kotlin.math.abs
 
 class MeasurementViewModel : ViewModel() {
@@ -66,11 +61,8 @@ class MeasurementViewModel : ViewModel() {
     private val _isMeasuring = MutableStateFlow(false)
     val isMeasuring: StateFlow<Boolean> = _isMeasuring.asStateFlow()
 
-    private val _capturedAccel = MutableStateFlow<List<Session>>(emptyList())
-    val capturedAccel: StateFlow<List<Session>> = _capturedAccel.asStateFlow()
-
-    private val _capturedGyro = MutableStateFlow<List<Session>>(emptyList())
-    val capturedGyro: StateFlow<List<Session>> = _capturedGyro.asStateFlow()
+    private val _sessions = MutableStateFlow<List<Session>>(emptyList())
+    val sessions: StateFlow<List<Session>> = _sessions.asStateFlow()
 
     private var dataClient: DataClient? = null
 
@@ -87,17 +79,19 @@ class MeasurementViewModel : ViewModel() {
     }
 
     fun addAccelMeasurement(measurement: Measurement) {
-        _capturedAccel.update { sessions ->
+        _sessions.update { sessions ->
             if (sessions.isEmpty()) return@update sessions
             val currentSession = sessions.last()
-            val last = currentSession.measurements.lastOrNull()
+            val last = currentSession.accelerometerMeasurements.lastOrNull()
             if (last == null ||
                 abs(last.x - measurement.x) > 0.1f ||
                 abs(last.y - measurement.y) > 0.1f ||
                 abs(last.z - measurement.z) > 0.1f ||
                 measurement.timestamp - last.timestamp > 10_000
             ) {
-                sessions.dropLast(1) + currentSession.copy(measurements = currentSession.measurements + measurement)
+                sessions.dropLast(1) + currentSession.copy(
+                    accelerometerMeasurements = currentSession.accelerometerMeasurements + measurement,
+                )
             } else {
                 sessions
             }
@@ -105,17 +99,19 @@ class MeasurementViewModel : ViewModel() {
     }
 
     fun addGyroMeasurement(measurement: Measurement) {
-        _capturedGyro.update { sessions ->
+        _sessions.update { sessions ->
             if (sessions.isEmpty()) return@update sessions
             val currentSession = sessions.last()
-            val last = currentSession.measurements.lastOrNull()
+            val last = currentSession.gyroscopeMeasurements.lastOrNull()
             if (last == null ||
                 abs(last.x - measurement.x) > 0.1f ||
                 abs(last.y - measurement.y) > 0.1f ||
                 abs(last.z - measurement.z) > 0.1f ||
                 measurement.timestamp - last.timestamp > 10_000
             ) {
-                sessions.dropLast(1) + currentSession.copy(measurements = currentSession.measurements + measurement)
+                sessions.dropLast(1) + currentSession.copy(
+                    gyroscopeMeasurements = currentSession.gyroscopeMeasurements + measurement,
+                )
             } else {
                 sessions
             }
@@ -126,45 +122,50 @@ class MeasurementViewModel : ViewModel() {
         _isMeasuring.update { wasMeasuring ->
             val nowMeasuring = !wasMeasuring
             if (nowMeasuring) {
-                _capturedAccel.update { it + Session() }
-                _capturedGyro.update { it + Session() }
+                _sessions.update { it + Session() }
             } else {
-                _capturedAccel.value.lastOrNull()?.let { syncSession(it, "accel") }
-                _capturedGyro.value.lastOrNull()?.let { syncSession(it, "gyro") }
+                _sessions.value.lastOrNull()?.let { syncSession(it) }
             }
             nowMeasuring
         }
     }
 
-    private fun syncSession(
-        session: Session,
-        type: String,
-    ) {
+    private fun syncSession(session: Session) {
         val client = dataClient ?: return
 
         val json =
             JSONObject().apply {
                 put("timestamp", session.timestamp)
-                put("type", type)
 
-                val measurements = JSONArray()
-                session.measurements.forEach { m ->
-                    val sample =
+                val accelArray = JSONArray()
+                session.accelerometerMeasurements.forEach { m ->
+                    accelArray.put(
                         JSONObject().apply {
                             put("x", m.x)
                             put("y", m.y)
                             put("z", m.z)
                             put("timestamp", m.timestamp)
-                        }
-
-                    measurements.put(sample)
+                        },
+                    )
                 }
+                put("accelerometer", accelArray)
 
-                put("measurements", measurements)
+                val gyroArray = JSONArray()
+                session.gyroscopeMeasurements.forEach { m ->
+                    gyroArray.put(
+                        JSONObject().apply {
+                            put("x", m.x)
+                            put("y", m.y)
+                            put("z", m.z)
+                            put("timestamp", m.timestamp)
+                        },
+                    )
+                }
+                put("gyroscope", gyroArray)
             }
 
         val putRequest =
-            PutDataMapRequest.create("/sessions/$type/${session.timestamp}").run {
+            PutDataMapRequest.create("/sessions/${session.timestamp}").run {
                 dataMap.putString("session_data", json.toString())
                 dataMap.putLong("timestamp", System.currentTimeMillis())
                 asPutDataRequest().apply {
@@ -174,8 +175,8 @@ class MeasurementViewModel : ViewModel() {
 
         client
             .putDataItem(putRequest)
-            .addOnSuccessListener { Log.d("Sync", "Successfully synced session $type ${session.timestamp}") }
-            .addOnFailureListener { Log.e("Sync", "Failed to sync session $type ${session.timestamp}", it) }
+            .addOnSuccessListener { Log.d("Sync", "Successfully synced session ${session.timestamp}") }
+            .addOnFailureListener { Log.e("Sync", "Failed to sync session ${session.timestamp}", it) }
     }
 }
 
@@ -246,13 +247,12 @@ class MainActivity :
 
 @Composable
 private fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementViewModel()) {
-    val pagerState = rememberPagerState(pageCount = { 3 })
+    val pagerState = rememberPagerState(pageCount = { 2 })
 
     val accelMeasurement by measurementViewModel.accelMeasurement.collectAsState()
     val gyroMeasurement by measurementViewModel.gyroMeasurement.collectAsState()
     val isMeasuring by measurementViewModel.isMeasuring.collectAsState()
-    val capturedAccel by measurementViewModel.capturedAccel.collectAsState()
-    val capturedGyro by measurementViewModel.capturedGyro.collectAsState()
+    val sessions by measurementViewModel.sessions.collectAsState()
 
     TennisTrackerTheme {
         HorizontalPager(state = pagerState) { page ->
@@ -275,11 +275,7 @@ private fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementView
                     }
 
                     1 -> {
-                        HistoryScreen("Acc History", capturedAccel)
-                    }
-
-                    2 -> {
-                        HistoryScreen("Gyro History", capturedGyro)
+                        HistoryScreen(sessions)
                     }
                 }
             }
@@ -288,12 +284,7 @@ private fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementView
 }
 
 @Composable
-private fun HistoryScreen(
-    title: String,
-    sessions: List<Session>,
-) {
-    val timeFormatter = SimpleDateFormat("HH:mm:ss.SSS", LocalLocale.current.platformLocale)
-
+private fun HistoryScreen(sessions: List<Session>) {
     ScalingLazyColumn(
         modifier = Modifier.fillMaxSize(),
         autoCentering = AutoCenteringParams(itemIndex = 0),
@@ -302,7 +293,7 @@ private fun HistoryScreen(
             Text(
                 modifier = Modifier.padding(bottom = 8.dp),
                 textAlign = TextAlign.Center,
-                text = title,
+                text = "Session History",
                 style = MaterialTheme.typography.title3,
             )
         }
@@ -315,18 +306,14 @@ private fun HistoryScreen(
                     color = MaterialTheme.colors.secondary,
                 )
             }
-            items(session.measurements.asReversed()) { m ->
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
+            item {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = timeFormatter.format(Date(m.timestamp)),
+                        text = "Acc: ${session.accelerometerMeasurements.size} samples",
                         style = MaterialTheme.typography.caption2,
-                        color = MaterialTheme.colors.secondary,
                     )
                     Text(
-                        text = "%.2f, %.2f, %.2f".format(m.x, m.y, m.z),
+                        text = "Gyro: ${session.gyroscopeMeasurements.size} samples",
                         style = MaterialTheme.typography.caption2,
                     )
                 }

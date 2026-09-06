@@ -11,19 +11,32 @@ fun sessionsToJson(sessions: List<Session>): String {
         val sessionObject = JSONObject()
         sessionObject.put("timestamp", session.timestamp)
 
-        val measurementsArray = JSONArray()
-        session.measurements.forEach { m ->
-            val measurementObject = JSONObject().apply {
-                put("x", m.x)
-                put("y", m.y)
-                put("z", m.z)
-                put("timestamp", m.timestamp)
-            }
-
-            measurementsArray.put(measurementObject)
+        val accelArray = JSONArray()
+        session.accelerometerMeasurements.forEach { m ->
+            accelArray.put(
+                JSONObject().apply {
+                    put("x", m.x)
+                    put("y", m.y)
+                    put("z", m.z)
+                    put("timestamp", m.timestamp)
+                },
+            )
         }
+        sessionObject.put("accelerometer", accelArray)
 
-        sessionObject.put("measurements", measurementsArray)
+        val gyroArray = JSONArray()
+        session.gyroscopeMeasurements.forEach { m ->
+            gyroArray.put(
+                JSONObject().apply {
+                    put("x", m.x)
+                    put("y", m.y)
+                    put("z", m.z)
+                    put("timestamp", m.timestamp)
+                },
+            )
+        }
+        sessionObject.put("gyroscope", gyroArray)
+
         root.put(sessionObject)
     }
 

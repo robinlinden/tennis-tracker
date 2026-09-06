@@ -25,21 +25,41 @@ class SessionListenerService : WearableListenerService() {
 
                 val json = JSONObject(jsonData)
                 val timestamp = json.getLong("timestamp")
-                val measurementsArray = json.getJSONArray("measurements")
-                val measurements = mutableListOf<Measurement>()
-                for (i in 0 until measurementsArray.length()) {
-                    val measurement = measurementsArray.getJSONObject(i)
-                    measurements.add(
+
+                val accelArray = json.getJSONArray("accelerometer")
+                val accelMeasurements = mutableListOf<Measurement>()
+                for (i in 0 until accelArray.length()) {
+                    val m = accelArray.getJSONObject(i)
+                    accelMeasurements.add(
                         Measurement(
-                            x = measurement.getDouble("x").toFloat(),
-                            y = measurement.getDouble("y").toFloat(),
-                            z = measurement.getDouble("z").toFloat(),
-                            timestamp = measurement.getLong("timestamp"),
+                            x = m.getDouble("x").toFloat(),
+                            y = m.getDouble("y").toFloat(),
+                            z = m.getDouble("z").toFloat(),
+                            timestamp = m.getLong("timestamp"),
                         ),
                     )
                 }
 
-                val session = Session(timestamp = timestamp, measurements = measurements)
+                val gyroArray = json.getJSONArray("gyroscope")
+                val gyroMeasurements = mutableListOf<Measurement>()
+                for (i in 0 until gyroArray.length()) {
+                    val m = gyroArray.getJSONObject(i)
+                    gyroMeasurements.add(
+                        Measurement(
+                            x = m.getDouble("x").toFloat(),
+                            y = m.getDouble("y").toFloat(),
+                            z = m.getDouble("z").toFloat(),
+                            timestamp = m.getLong("timestamp"),
+                        ),
+                    )
+                }
+
+                val session =
+                    Session(
+                        timestamp = timestamp,
+                        accelerometerMeasurements = accelMeasurements,
+                        gyroscopeMeasurements = gyroMeasurements,
+                    )
                 val repository = (application as TennisTrackerApplication).sessionRepository
                 repository.addSession(session)
                 Log.d("SessionListener", "Received session: $timestamp")

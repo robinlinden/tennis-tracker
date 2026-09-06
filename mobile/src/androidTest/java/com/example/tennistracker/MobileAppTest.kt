@@ -52,7 +52,9 @@ class MobileAppTest {
 
     @Test
     fun exportButton_shownWhenHasData() {
-        repository.addSession(Session(measurements = listOf(Measurement(1f, 1f, 1f, 0L))))
+        repository.addSession(
+            Session(accelerometerMeasurements = listOf(Measurement(1f, 1f, 1f, 0L))),
+        )
 
         composeTestRule.setContent {
             MobileApp(viewModel = viewModel)
@@ -63,7 +65,12 @@ class MobileAppTest {
 
     @Test
     fun exportFlow_writesCorrectData() {
-        val testSession = Session(timestamp = 12345L, measurements = listOf(Measurement(1.2f, 3.4f, 5.6f, 6789L)))
+        val testSession = Session(
+            timestamp = 12345L,
+            accelerometerMeasurements = listOf(Measurement(1.2f, 3.4f, 5.6f, 6789L)),
+            gyroscopeMeasurements = listOf(Measurement(7.8f, 9.0f, 1.2f, 7000L)),
+        )
+
         repository.addSession(testSession)
 
         // Prepare a temporary file to act as the "selected" file.
@@ -74,9 +81,7 @@ class MobileAppTest {
         val tempUri = Uri.fromFile(tempFile)
 
         // Mock the result of the CREATE_DOCUMENT intent.
-        val resultData = Intent().apply {
-            data = tempUri
-        }
+        val resultData = Intent().apply { data = tempUri }
         val result = Instrumentation.ActivityResult(Activity.RESULT_OK, resultData)
         intending(hasAction(Intent.ACTION_CREATE_DOCUMENT)).respondWith(result)
 
@@ -100,13 +105,22 @@ class MobileAppTest {
         val sessionJson = jsonArray.getJSONObject(0)
         assertEquals(12345L, sessionJson.getLong("timestamp"))
 
-        val measurementsJson = sessionJson.getJSONArray("measurements")
-        assertEquals(1, measurementsJson.length())
+        val accelJson = sessionJson.getJSONArray("accelerometer")
+        assertEquals(1, accelJson.length())
 
-        val measurementJson = measurementsJson.getJSONObject(0)
+        val measurementJson = accelJson.getJSONObject(0)
         assertEquals(1.2, measurementJson.getDouble("x"), 0.0001)
         assertEquals(3.4, measurementJson.getDouble("y"), 0.0001)
         assertEquals(5.6, measurementJson.getDouble("z"), 0.0001)
         assertEquals(6789L, measurementJson.getLong("timestamp"))
+
+        val gyroJson = sessionJson.getJSONArray("gyroscope")
+        assertEquals(1, gyroJson.length())
+
+        val gyroMeasurementJson = gyroJson.getJSONObject(0)
+        assertEquals(7.8, gyroMeasurementJson.getDouble("x"), 0.0001)
+        assertEquals(9.0, gyroMeasurementJson.getDouble("y"), 0.0001)
+        assertEquals(1.2, gyroMeasurementJson.getDouble("z"), 0.0001)
+        assertEquals(7000L, gyroMeasurementJson.getLong("timestamp"))
     }
 }
