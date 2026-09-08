@@ -2,10 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
 
     <uses-feature android:name="android.hardware.type.watch" />
 
     <application
+        android:name=".TennisTrackerApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -34,6 +39,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".presentation.SensorService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="health" />
     </application>
 
 </manifest>
