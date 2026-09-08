@@ -1,13 +1,13 @@
 package com.example.tennistracker.presentation
 
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.ViewModel
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
@@ -37,32 +38,24 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
 import androidx.wear.tooling.preview.devices.WearDevices
+import com.example.tennistracker.TennisTrackerApplication
 import com.example.tennistracker.common.Measurement
 import com.example.tennistracker.common.Session
 import com.example.tennistracker.presentation.theme.TennisTrackerTheme
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import org.json.JSONArray
 import org.json.JSONObject
-import kotlin.math.abs
 
-class MeasurementViewModel : ViewModel() {
-    private val _accelMeasurement = MutableStateFlow(Measurement(0.0f, 0.0f, 0.0f, 0L))
-    val accelMeasurement: StateFlow<Measurement> = _accelMeasurement.asStateFlow()
-
-    private val _gyroMeasurement = MutableStateFlow(Measurement(0.0f, 0.0f, 0.0f, 0L))
-    val gyroMeasurement: StateFlow<Measurement> = _gyroMeasurement.asStateFlow()
-
-    private val _isMeasuring = MutableStateFlow(false)
-    val isMeasuring: StateFlow<Boolean> = _isMeasuring.asStateFlow()
-
-    private val _sessions = MutableStateFlow<List<Session>>(emptyList())
-    val sessions: StateFlow<List<Session>> = _sessions.asStateFlow()
+class MeasurementViewModel(
+    repository: SensorRepository,
+) : ViewModel() {
+    val accelMeasurement: StateFlow<Measurement> = repository.accelMeasurement
+    val gyroMeasurement: StateFlow<Measurement> = repository.gyroMeasurement
+    val isMeasuring: StateFlow<Boolean> = repository.isMeasuring
+    val sessions: StateFlow<List<Session>> = repository.sessions
 
     private var dataClient: DataClient? = null
 
@@ -70,63 +63,14 @@ class MeasurementViewModel : ViewModel() {
         dataClient = client
     }
 
-    fun setAccelMeasurement(newMeasurement: Measurement) {
-        _accelMeasurement.update { newMeasurement }
-    }
-
-    fun setGyroMeasurement(newMeasurement: Measurement) {
-        _gyroMeasurement.update { newMeasurement }
-    }
-
-    fun addAccelMeasurement(measurement: Measurement) {
-        _sessions.update { sessions ->
-            if (sessions.isEmpty()) return@update sessions
-            val currentSession = sessions.last()
-            val last = currentSession.accelerometerMeasurements.lastOrNull()
-            if (last == null ||
-                abs(last.x - measurement.x) > 0.1f ||
-                abs(last.y - measurement.y) > 0.1f ||
-                abs(last.z - measurement.z) > 0.1f ||
-                measurement.timestamp - last.timestamp > 10_000
-            ) {
-                sessions.dropLast(1) + currentSession.copy(
-                    accelerometerMeasurements = currentSession.accelerometerMeasurements + measurement,
-                )
-            } else {
-                sessions
-            }
-        }
-    }
-
-    fun addGyroMeasurement(measurement: Measurement) {
-        _sessions.update { sessions ->
-            if (sessions.isEmpty()) return@update sessions
-            val currentSession = sessions.last()
-            val last = currentSession.gyroscopeMeasurements.lastOrNull()
-            if (last == null ||
-                abs(last.x - measurement.x) > 0.1f ||
-                abs(last.y - measurement.y) > 0.1f ||
-                abs(last.z - measurement.z) > 0.1f ||
-                measurement.timestamp - last.timestamp > 10_000
-            ) {
-                sessions.dropLast(1) + currentSession.copy(
-                    gyroscopeMeasurements = currentSession.gyroscopeMeasurements + measurement,
-                )
-            } else {
-                sessions
-            }
-        }
-    }
-
-    fun toggleMeasuring() {
-        _isMeasuring.update { wasMeasuring ->
-            val nowMeasuring = !wasMeasuring
-            if (nowMeasuring) {
-                _sessions.update { it + Session() }
-            } else {
-                _sessions.value.lastOrNull()?.let { syncSession(it) }
-            }
-            nowMeasuring
+    fun toggleMeasuring(context: android.content.Context) {
+        val wasMeasuring = isMeasuring.value
+        val intent = Intent(context, SensorService::class.java)
+        if (!wasMeasuring) {
+            ContextCompat.startForegroundService(context, intent)
+        } else {
+            context.stopService(intent)
+            sessions.value.lastOrNull()?.let { syncSession(it) }
         }
     }
 
@@ -180,28 +124,29 @@ class MeasurementViewModel : ViewModel() {
     }
 }
 
-class MainActivity :
-    ComponentActivity(),
-    SensorEventListener {
+class MainActivity : ComponentActivity() {
     companion object {
         const val TAG = "MainActivity"
     }
 
-    lateinit var sensorManager: SensorManager
-    lateinit var accelerometer: Sensor
-    lateinit var gyroscope: Sensor
-
-    var measurementViewModel: MeasurementViewModel = MeasurementViewModel()
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { permissions ->
+        val rejected = permissions.filterValues { !it }
+        if (rejected.isNotEmpty()) {
+            Log.e(TAG, "Permissions rejected: ${rejected.keys}")
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
 
         super.onCreate(savedInstanceState)
 
-        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)!!
-        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)!!
+        checkPermissions()
 
+        val repository = (application as TennisTrackerApplication).sensorRepository
+        val measurementViewModel = MeasurementViewModel(repository)
         measurementViewModel.setDataClient(Wearable.getDataClient(this))
 
         setTheme(android.R.style.Theme_DeviceDefault)
@@ -211,43 +156,26 @@ class MainActivity :
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
-        sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_GAME)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        sensorManager.unregisterListener(this)
-    }
-
-    override fun onSensorChanged(e: SensorEvent) {
-        val measurement = Measurement(e.values[0], e.values[1], e.values[2], System.currentTimeMillis())
-        if (e.sensor.type == Sensor.TYPE_ACCELEROMETER) {
-            if (measurementViewModel.isMeasuring.value) {
-                measurementViewModel.addAccelMeasurement(measurement)
-            }
-            measurementViewModel.setAccelMeasurement(measurement)
-        } else {
-            if (measurementViewModel.isMeasuring.value) {
-                measurementViewModel.addGyroMeasurement(measurement)
-            }
-            measurementViewModel.setGyroMeasurement(measurement)
+    private fun checkPermissions() {
+        val permissions = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
         }
-    }
 
-    override fun onAccuracyChanged(
-        sensor: Sensor,
-        accuracy: Int,
-    ) {
-        Log.e(TAG, "Accuracy changed $sensor $accuracy")
+        val toRequest = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (toRequest.isNotEmpty()) {
+            permissionLauncher.launch(toRequest.toTypedArray())
+        }
     }
 }
 
 @Composable
-private fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementViewModel()) {
+private fun WearApp(measurementViewModel: MeasurementViewModel) {
     val pagerState = rememberPagerState(pageCount = { 2 })
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val accelMeasurement by measurementViewModel.accelMeasurement.collectAsState()
     val gyroMeasurement by measurementViewModel.gyroMeasurement.collectAsState()
@@ -270,7 +198,7 @@ private fun WearApp(measurementViewModel: MeasurementViewModel = MeasurementView
                             isMeasuring = isMeasuring,
                             gyroMeasurement = gyroMeasurement,
                             accelMeasurement = accelMeasurement,
-                            onToggleMeasuring = { measurementViewModel.toggleMeasuring() },
+                            onToggleMeasuring = { measurementViewModel.toggleMeasuring(context) },
                         )
                     }
 
@@ -410,5 +338,6 @@ private fun MeasurementsColumn(
 @Preview(device = WearDevices.SMALL_ROUND, showSystemUi = true)
 @Composable
 private fun DefaultPreview() {
-    WearApp()
+    val repository = SensorRepository()
+    WearApp(MeasurementViewModel(repository))
 }
