@@ -45,7 +45,10 @@ import com.example.tennistracker.presentation.theme.TennisTrackerTheme
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -57,10 +60,21 @@ class MeasurementViewModel(
     val isMeasuring: StateFlow<Boolean> = repository.isMeasuring
     val sessions: StateFlow<List<Session>> = repository.sessions
 
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
     private var dataClient: DataClient? = null
 
     fun setDataClient(client: DataClient) {
         dataClient = client
+    }
+
+    fun clearError() {
+        _errorMessage.update { null }
+    }
+
+    fun setError(message: String) {
+        _errorMessage.update { message }
     }
 
     fun toggleMeasuring(context: android.content.Context) {
@@ -120,7 +134,10 @@ class MeasurementViewModel(
         client
             .putDataItem(putRequest)
             .addOnSuccessListener { Log.d("Sync", "Successfully synced session ${session.timestamp}") }
-            .addOnFailureListener { Log.e("Sync", "Failed to sync session ${session.timestamp}", it) }
+            .addOnFailureListener { e ->
+                Log.e("Sync", "Failed to sync session ${session.timestamp}", e)
+                _errorMessage.update { "Sync failed: ${e.localizedMessage ?: "Unknown error"}" }
+            }
     }
 }
 
@@ -181,6 +198,7 @@ private fun WearApp(measurementViewModel: MeasurementViewModel) {
     val gyroMeasurement by measurementViewModel.gyroMeasurement.collectAsState()
     val isMeasuring by measurementViewModel.isMeasuring.collectAsState()
     val sessions by measurementViewModel.sessions.collectAsState()
+    val errorMessage by measurementViewModel.errorMessage.collectAsState()
 
     TennisTrackerTheme {
         HorizontalPager(state = pagerState) { page ->
@@ -198,7 +216,9 @@ private fun WearApp(measurementViewModel: MeasurementViewModel) {
                             isMeasuring = isMeasuring,
                             gyroMeasurement = gyroMeasurement,
                             accelMeasurement = accelMeasurement,
+                            errorMessage = errorMessage,
                             onToggleMeasuring = { measurementViewModel.toggleMeasuring(context) },
+                            onDismissError = { measurementViewModel.clearError() },
                         )
                     }
 
@@ -255,20 +275,35 @@ private fun SensorValuesScreen(
     isMeasuring: Boolean,
     gyroMeasurement: Measurement,
     accelMeasurement: Measurement,
+    errorMessage: String?,
     onToggleMeasuring: () -> Unit,
+    onDismissError: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        DisplayValues(
-            gyroMeasurement = gyroMeasurement,
-            accelMeasurement = accelMeasurement,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(onClick = onToggleMeasuring) {
-            Text(if (isMeasuring) "Stop" else "Start")
+        if (errorMessage != null) {
+            Text(
+                text = errorMessage,
+                style = MaterialTheme.typography.caption2,
+                color = MaterialTheme.colors.error,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(onClick = onDismissError) {
+                Text("Dismiss", style = MaterialTheme.typography.caption2)
+            }
+        } else {
+            DisplayValues(
+                gyroMeasurement = gyroMeasurement,
+                accelMeasurement = accelMeasurement,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(onClick = onToggleMeasuring) {
+                Text(if (isMeasuring) "Stop" else "Start")
+            }
         }
     }
 }
