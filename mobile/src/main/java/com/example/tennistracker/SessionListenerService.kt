@@ -3,9 +3,11 @@ package com.example.tennistracker
 import android.util.Log
 import com.example.tennistracker.common.Measurement
 import com.example.tennistracker.common.Session
+import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
+import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import org.json.JSONObject
 
@@ -19,9 +21,11 @@ class SessionListenerService : WearableListenerService() {
             }
 
             try {
-                val jsonData =
-                    DataMapItem.fromDataItem(ev.dataItem).dataMap.getString("session_data")
-                        ?: throw Exception("Missing session_data")
+                val asset = DataMapItem.fromDataItem(ev.dataItem).dataMap.getAsset("session_data")
+                    ?: throw Exception("Missing session_data")
+
+                val assetResult = Tasks.await(Wearable.getDataClient(this).getFdForAsset(asset))
+                val jsonData = assetResult.inputStream.bufferedReader().use { it.readText() }
 
                 val json = JSONObject(jsonData)
                 val timestamp = json.getLong("timestamp")

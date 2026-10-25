@@ -42,6 +42,7 @@ import com.example.tennistracker.TennisTrackerApplication
 import com.example.tennistracker.common.Measurement
 import com.example.tennistracker.common.Session
 import com.example.tennistracker.presentation.theme.TennisTrackerTheme
+import com.google.android.gms.wearable.Asset
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
@@ -124,7 +125,9 @@ class MeasurementViewModel(
 
         val putRequest =
             PutDataMapRequest.create("/sessions/${session.timestamp}").run {
-                dataMap.putString("session_data", json.toString())
+                val bytes = json.toString().toByteArray(Charsets.UTF_8)
+                val asset = Asset.createFromBytes(bytes)
+                dataMap.putAsset("session_data", asset)
                 dataMap.putLong("timestamp", System.currentTimeMillis())
                 asPutDataRequest().apply {
                     setUrgent()
