@@ -37,4 +37,21 @@ class SessionRepositoryTest {
         assertEquals(3f, loadedSession.accelerometerMeasurements[0].z)
         assertEquals(123L, loadedSession.accelerometerMeasurements[0].timestamp)
     }
+
+    @Test
+    fun sessionRepository_deleteSession() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        File(context.filesDir, "sessions.json").delete()
+
+        val repo = SessionRepository(context)
+        val session1 = Session(timestamp = 1000L)
+        val session2 = Session(timestamp = 2000L)
+        repo.addSession(session1)
+        repo.addSession(session2)
+        assertEquals(2, repo.sessions.value.size)
+
+        repo.deleteSession(session1)
+        assertEquals(1, repo.sessions.value.size)
+        assertEquals(2000L, repo.sessions.value[0].timestamp)
+    }
 }

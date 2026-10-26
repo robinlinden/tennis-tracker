@@ -49,4 +49,12 @@ class SessionRepository(
             updated
         }
     }
+
+    fun deleteSession(session: Session) {
+        _sessions.update { currentSessions ->
+            val updated = currentSessions.filterNot { it == session }
+            saveSessions(updated)
+            updated
+        }
+    }
 }
