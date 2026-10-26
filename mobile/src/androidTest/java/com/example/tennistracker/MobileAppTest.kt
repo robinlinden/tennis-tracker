@@ -5,8 +5,10 @@ import android.app.Instrumentation
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.espresso.intent.Intents
 import androidx.test.espresso.intent.Intents.intending
 import androidx.test.espresso.intent.matcher.IntentMatchers.hasAction
@@ -122,5 +124,26 @@ class MobileAppTest {
         assertEquals(9.0, gyroMeasurementJson.getDouble("y"), 0.0001)
         assertEquals(1.2, gyroMeasurementJson.getDouble("z"), 0.0001)
         assertEquals(7000L, gyroMeasurementJson.getLong("timestamp"))
+    }
+
+    @Test
+    fun deleteSession_removesSessionFromUi() {
+        val testSession = Session(
+            timestamp = 12345L,
+            accelerometerMeasurements = listOf(Measurement(1.2f, 3.4f, 5.6f, 6789L)),
+        )
+        repository.addSession(testSession)
+
+        composeTestRule.setContent {
+            MobileApp(viewModel = viewModel)
+        }
+
+        composeTestRule.onNodeWithText("1 accel, 0 gyro measurements").assertExists()
+        composeTestRule.onNodeWithText("1 accel, 0 gyro measurements").performTouchInput { longClick() }
+        composeTestRule.onNodeWithText("Delete").performClick()
+
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("1 accel, 0 gyro measurements").assertDoesNotExist()
     }
 }

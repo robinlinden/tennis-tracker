@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +24,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,9 +40,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 
 class MobileViewModel(
-    repository: SessionRepository,
+    private val repository: SessionRepository,
 ) : ViewModel() {
     val sessions = repository.sessions
+
+    fun deleteSession(session: Session) {
+        repository.deleteSession(session)
+    }
 }
 
 class MainActivity : ComponentActivity() {
@@ -67,6 +76,7 @@ fun MobileApp(
 ) {
     val sessions by viewModel.sessions.collectAsState()
     val context = LocalContext.current
+    var sessionToDelete by remember { mutableStateOf<Session?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json"),
@@ -106,21 +116,57 @@ fun MobileApp(
         } else {
             LazyColumn {
                 items(sessions.asReversed()) { session ->
-                    SessionItem(session)
+                    SessionItem(
+                        session = session,
+                        onLongClick = { sessionToDelete = session },
+                    )
                 }
             }
         }
     }
+
+    sessionToDelete?.let { session ->
+        val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", LocalLocale.current.platformLocale)
+        AlertDialog(
+            onDismissRequest = { sessionToDelete = null },
+            title = { Text("Delete Session") },
+            text = { Text("Are you sure you want to delete the session for ${dateFormatter.format(session.timestamp)}?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteSession(session)
+                        sessionToDelete = null
+                    },
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { sessionToDelete = null },
+                ) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
 }
 
 @Composable
-private fun SessionItem(session: Session) {
+private fun SessionItem(
+    session: Session,
+    onLongClick: () -> Unit,
+) {
     val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", LocalLocale.current.platformLocale)
     Card(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp),
+                .padding(vertical = 8.dp)
+                .combinedClickable(
+                    onClick = {},
+                    onLongClick = onLongClick,
+                ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
