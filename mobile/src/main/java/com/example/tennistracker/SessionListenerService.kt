@@ -67,6 +67,9 @@ class SessionListenerService : WearableListenerService() {
                 val repository = (application as TennisTrackerApplication).sessionRepository
                 repository.addSession(session)
                 Log.d("SessionListener", "Received session: $timestamp")
+
+                Tasks.await(Wearable.getDataClient(this).deleteDataItems(ev.dataItem.uri))
+                Log.d("SessionListener", "Deleted data item: ${ev.dataItem.uri}")
             } catch (e: Exception) {
                 Log.e("SessionListener", "Error parsing session data", e)
             }
